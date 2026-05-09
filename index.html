@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Chatbot </title>
+</head>
+<body>
+<h2>AI Chatbot making</h2>
+
+<div>
+    {% for msg in the chat %}
+    <p><b>{{msg.sender}}:</b>{{msg.text}}</p>
+    {% endfor %}
+</div>
+
+<form method="post">
+    <input type="text" name="message" placeholder="Type msg.." required>
+    <button type="submit"> Send</button>
+</form>
+</body>
+</html>
