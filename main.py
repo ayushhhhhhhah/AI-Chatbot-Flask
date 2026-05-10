@@ -1,25 +1,28 @@
-import requests
+from groq import Groq
+import os
 
-API_KEY = "AIzaSyAwXTZmQ0AeDwnmoHY11heDqP63p7UQ-oQ"
-
-url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={"AIzaSyAwXTZmQ0AeDwnmoHY11heDqP63p7UQ-oQ"}"
+client = Groq(
+    api_key=os.environ.get("GROQ_API_KEY")
+)
 
 def ask_ai(user_input):
-    response = requests.post(
-        url,
-        json={
-            "contents": [
-                {
-                    "parts": [{"text": user_input}]
-                }
-            ]
-        }
-    )
-
-    data = response.json()
 
     try:
-        return data["candidates"][0]["content"]["parts"][0]["text"]
-    except:
-        return "Error: " + str(data)
+
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": user_input,
+                }
+            ],
+
+            model="llama-3.1-8b-instant"
+        )
+
+        return chat_completion.choices[0].message.content
+
+    except Exception as e:
+
+        return f"Error: {str(e)}"
 
