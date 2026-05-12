@@ -30,7 +30,7 @@ body::before{
     position:absolute;
     width:400px;
     height:400px;
-    background:#2563eb;
+    background:#423075  ;
     border-radius:50%;
     filter:blur(150px);
     top:-100px;
@@ -52,7 +52,7 @@ body::after{
 }
 
 .login-box{
-    width:380px;
+    width:480px;
     padding:40px;
     background:rgba(255,255,255,0.08);
     backdrop-filter:blur(20px);
@@ -65,14 +65,14 @@ body::after{
 .login-box h2{
     text-align:center;
     color:white;
-    margin-bottom:10px;
+    margin-bottom:20px;
     font-size:32px;
 }
 
 .login-box p{
     text-align:center;
     color:#cbd5e1;
-    margin-bottom:30px;
+    margin-bottom:40px;
 }
 
 .input-box{
@@ -149,6 +149,15 @@ body::after{
         <div class="input-box">
             <input type="password" name="password" placeholder="Enter Password" required>
         </div>
+
+        <div class="input-box">
+            <input type="number" name="capcha" placeholder="What is 55 + 20" required>
+        </div>
+
+
+        <img src="/captcha" alt="captcha">
+
+<input type="text" name="captcha" placeholder="Enter Captcha" required>
 
         <button type="submit" class="login-btn">
             Login

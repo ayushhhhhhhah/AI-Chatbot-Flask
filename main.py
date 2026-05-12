@@ -1,6 +1,8 @@
 from groq import Groq
 import os
 
+import os
+
 client = Groq(
     api_key=os.environ.get("GROQ_API_KEY")
 )

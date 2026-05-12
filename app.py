@@ -1,17 +1,47 @@
-from flask import Flask, request, redirect
+from flask import Flask, request, redirect, session, send_file
 import sqlite3
 from main import ask_ai
+from captcha.image import ImageCaptcha
+import random
+import string
 
 app = Flask(__name__)
 
+# Secret Key For Session
+app.secret_key = "super_secret_key_123"
+
+# Store Chat Messages
 chat_history = []
 
 
 # =========================
-# LOGIN PAGE
+# CAPTCHA ROUTE
+# =========================
+@app.route('/captcha')
+def captcha():
+
+    image = ImageCaptcha()
+
+    captcha_text = ''.join(
+        random.choices(
+            string.ascii_uppercase + string.digits,
+            k=5
+        )
+    )
+
+    session['captcha'] = captcha_text
+
+    data = image.generate(captcha_text)
+
+    return send_file(data, mimetype='image/png')
+
+
+# =========================
+# HOME PAGE
 # =========================
 @app.route("/")
 def home():
+
     return open("templates/INDEX100.html").read()
 
 
@@ -23,10 +53,22 @@ def login():
 
     username = request.form["username"]
     password = request.form["password"]
+    captcha_input = request.form["captcha"]
 
+    # CAPTCHA CHECK
+    if captcha_input != session.get("captcha"):
+
+        return """
+        <h1 style='color:red;text-align:center;margin-top:50px;'>
+        Wrong Captcha ❌
+        </h1>
+        """
+
+    # DATABASE CONNECTION
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
 
+    # CHECK USER
     cursor.execute(
         "SELECT * FROM users WHERE username=? AND password=?",
         (username, password)
@@ -36,10 +78,16 @@ def login():
 
     conn.close()
 
+    # LOGIN SUCCESS
     if user:
-        return redirect("/chat")
 
+        session["user"] = username
+
+        return redirect("/dashboard")
+
+    # LOGIN FAILED
     else:
+
         return """
         <h1 style='color:red;text-align:center;margin-top:50px;'>
         Invalid Username or Password ❌
@@ -52,6 +100,7 @@ def login():
 # =========================
 @app.route("/signup")
 def signup_page():
+
     return open("templates/signup.html").read()
 
 
@@ -76,7 +125,150 @@ def signin():
     conn.commit()
     conn.close()
 
-    return redirect("/chat")
+    session["user"] = username
+
+    return redirect("/dashboard")
+
+
+# =========================
+# DASHBOARD PAGE
+# =========================
+@app.route("/dashboard")
+def dashboard():
+
+    # BLOCK DIRECT ACCESS
+    if "user" not in session:
+
+        return redirect("/")
+
+    username = session["user"]
+
+    return f"""
+    <!DOCTYPE html>
+    <html>
+
+    <head>
+
+    <title>Dashboard</title>
+
+    <style>
+
+    *{{
+        margin:0;
+        padding:0;
+        box-sizing:border-box;
+    }}
+
+    body{{
+        font-family:Arial;
+        background:linear-gradient(135deg,#0f172a,#111827,#1e1b4b);
+        height:100vh;
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        color:white;
+    }}
+
+    .dashboard{{
+        width:700px;
+        background:rgba(255,255,255,0.08);
+        backdrop-filter:blur(20px);
+        padding:40px;
+        border-radius:25px;
+        border:1px solid rgba(255,255,255,0.1);
+        box-shadow:0px 8px 32px rgba(0,0,0,0.3);
+        text-align:center;
+    }}
+
+    h1{{
+        margin-bottom:10px;
+        font-size:38px;
+    }}
+
+    p{{
+        color:#cbd5e1;
+        margin-bottom:30px;
+    }}
+
+    .cards{{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:20px;
+        margin-bottom:30px;
+    }}
+
+    .card{{
+        background:#1e293b;
+        padding:25px;
+        border-radius:20px;
+    }}
+
+    .card h2{{
+        margin-bottom:10px;
+        color:#60a5fa;
+    }}
+
+    .btn{{
+        display:inline-block;
+        padding:15px 30px;
+        background:linear-gradient(135deg,#2563eb,#7c3aed);
+        color:white;
+        text-decoration:none;
+        border-radius:15px;
+        font-weight:bold;
+        transition:0.3s;
+    }}
+
+    .btn:hover{{
+        transform:scale(1.05);
+    }}
+
+    </style>
+
+    </head>
+
+    <body>
+
+    <div class="dashboard">
+
+        <h1>Welcome, {username} 👋</h1>
+
+        <p>AI Assistant Dashboard</p>
+
+        <div class="cards">
+
+            <div class="card">
+                <h2>AI Chat</h2>
+                <p>Talk with AI instantly.</p>
+            </div>
+
+            <div class="card">
+                <h2>Ticketing System</h2>
+                <p>Coming Soon 🚀</p>
+            </div>
+
+            <div class="card">
+                <h2>Security</h2>
+                <p>Captcha Protected Login</p>
+            </div>
+
+            <div class="card">
+                <h2>Status</h2>
+                <p>System Online ✅</p>
+            </div>
+
+        </div>
+
+        <a href="/chat" class="btn">
+            Open Chatbot
+        </a>
+
+    </div>
+
+    </body>
+
+    </html>
+    """
 
 
 # =========================
@@ -84,6 +276,11 @@ def signin():
 # =========================
 @app.route("/chat", methods=["GET", "POST"])
 def chat():
+
+    # BLOCK DIRECT ACCESS
+    if "user" not in session:
+
+        return redirect("/")
 
     global chat_history
 
@@ -93,7 +290,7 @@ def chat():
 
         chat_history.append(f"You: {user_msg}")
 
-        # AI reply
+        # AI RESPONSE
         bot_reply = ask_ai(user_msg)
 
         chat_history.append(f"Bot: {bot_reply}")
@@ -126,33 +323,6 @@ body{
     overflow:hidden;
 }
 
-/* Glow Effects */
-body::before{
-    content:"";
-    position:absolute;
-    width:450px;
-    height:450px;
-    background:#06b6d4;
-    border-radius:50%;
-    filter:blur(150px);
-    top:-120px;
-    left:-120px;
-    opacity:0.3;
-}
-
-body::after{
-    content:"";
-    position:absolute;
-    width:450px;
-    height:450px;
-    background:#7c3aed;
-    border-radius:50%;
-    filter:blur(150px);
-    bottom:-120px;
-    right:-120px;
-    opacity:0.3;
-}
-
 .chat-container{
     width:600px;
     height:750px;
@@ -162,12 +332,10 @@ body::after{
     padding:25px;
     border:1px solid rgba(255,255,255,0.1);
     box-shadow:0px 8px 32px rgba(0,0,0,0.3);
-    z-index:10;
     display:flex;
     flex-direction:column;
 }
 
-/* Header */
 .chat-header{
     text-align:center;
     margin-bottom:20px;
@@ -176,39 +344,19 @@ body::after{
 .chat-header h2{
     color:white;
     font-size:32px;
-    margin-bottom:5px;
 }
 
-.chat-header p{
-    color:#cbd5e1;
-    font-size:14px;
-}
-
-/* Chat Box */
 .chat-box{
     flex:1;
     overflow-y:auto;
     padding:20px;
     border-radius:20px;
     background:#0f172a;
-    border:1px solid rgba(255,255,255,0.08);
     margin-bottom:20px;
 }
 
-/* Scrollbar */
-.chat-box::-webkit-scrollbar{
-    width:6px;
-}
-
-.chat-box::-webkit-scrollbar-thumb{
-    background:#64748b;
-    border-radius:10px;
-}
-
-/* User Message */
 .user{
-    display:flex;
-    justify-content:flex-end;
+    text-align:right;
     margin-bottom:15px;
 }
 
@@ -216,18 +364,12 @@ body::after{
     background:#2563eb;
     color:white;
     padding:14px 18px;
-    border-radius:18px 18px 0px 18px;
-    max-width:75%;
-    font-size:15px;
-    line-height:1.5;
-    word-wrap:break-word;
-    box-shadow:0px 4px 10px rgba(37,99,235,0.3);
+    border-radius:18px;
+    display:inline-block;
 }
 
-/* Bot Message */
 .bot{
-    display:flex;
-    justify-content:flex-start;
+    text-align:left;
     margin-bottom:15px;
 }
 
@@ -235,15 +377,10 @@ body::after{
     background:#10b981;
     color:white;
     padding:14px 18px;
-    border-radius:18px 18px 18px 0px;
-    max-width:75%;
-    font-size:15px;
-    line-height:1.5;
-    word-wrap:break-word;
-    box-shadow:0px 4px 10px rgba(16,185,129,0.3);
+    border-radius:18px;
+    display:inline-block;
 }
 
-/* Input Area */
 .chat-form{
     display:flex;
     gap:12px;
@@ -257,11 +394,6 @@ body::after{
     border-radius:16px;
     background:#1e293b;
     color:white;
-    font-size:15px;
-}
-
-.chat-form input::placeholder{
-    color:#94a3b8;
 }
 
 .chat-form button{
@@ -270,39 +402,7 @@ body::after{
     border-radius:16px;
     background:linear-gradient(135deg,#2563eb,#7c3aed);
     color:white;
-    font-size:15px;
-    font-weight:bold;
     cursor:pointer;
-    transition:0.3s;
-}
-
-.chat-form button:hover{
-    transform:scale(1.05);
-    opacity:0.9;
-}
-.support-email{
-    position:fixed;
-    bottom:20px;
-    right:20px;
-    background:rgba(255,255,255,0.1);
-    backdrop-filter:blur(10px);
-    padding:10px 16px;
-    border-radius:15px;
-    color:white;
-    font-size:14px;
-    border:1px solid rgba(255,255,255,0.1);
-    box-shadow:0px 4px 12px rgba(0,0,0,0.2);
-    z-index:999;
-}
-
-.support-email a{
-    color:#60a5fa;
-    text-decoration:none;
-    font-weight:bold;
-}
-
-.support-email a:hover{
-    text-decoration:underline;
 }
 
 </style>
@@ -315,19 +415,20 @@ body::after{
 
 <div class="chat-header">
     <h2>AI Chatbot 🤖</h2>
-    <p>Powered by Artificial Intelligence</p>
 </div>
 
 <div class="chat-box">
 """
 
-    # Show Messages
+    # SHOW MESSAGES
     for msg in chat_history:
 
         if "You:" in msg:
+
             html += f'<div class="user"><span>{msg}</span></div>'
 
         else:
+
             html += f'<div class="bot"><span>{msg}</span></div>'
 
     html += """
@@ -336,9 +437,9 @@ body::after{
 
 <form method="POST" class="chat-form">
 
-    <input type="text" name="message" placeholder="Type your message..." required>
+<input type="text" name="message" placeholder="Type your message..." required>
 
-    <button type="submit">Send</button>
+<button type="submit">Send</button>
 
 </form>
 
@@ -352,8 +453,19 @@ body::after{
 
 
 # =========================
+# LOGOUT
+# =========================
+@app.route("/logout")
+def logout():
+
+    session.pop("user", None)
+
+    return redirect("/")
+
+
+# =========================
 # RUN APP
 # =========================
 if __name__ == "__main__":
-    app.run(debug=True)
+
     app.run(debug=True)
